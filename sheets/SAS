@@ -1,0 +1,427 @@
+/* Cheatsheet SAS */
+
+/*Créer une librairie :*/
+libname tp '/home/u59580176/CCSAS'; 
+
+/*Créer un jeu de données */
+data tp.data1;
+input NOM $ AGE COUPLE $ ENFANT;
+/* le $ sert à indiquer que la variable sera une cha^ne de caractères*/
+/* ici, NOM et COUPLE seront des cha^nes*/
+cards; /*indique le début de la saisie*/
+AZ 34 oui 2
+ER 37 non 1
+RT 24 oui 0
+YU 28 oui 3
+IO 45 non 0
+PP 17 . 0
+run;
+
+/* Import de données */
+proc import datafile='/home/u59580176/CCSAS/inclu.txt'
+out = tp.inclu_dummy
+/* si besoin : dbms = xls */
+remplace;
+/* si besoin : getnames = yes;*/
+run;
+
+/*Vérifier l'import*/
+proc print data = tp.inclu_dummy;
+/*si besoin : var SEXE DIPNIV;*/
+run;
+
+/*Editer la structure du fichier :*/
+proc contents data=tp.inclu_dummy;
+run;
+
+/*----MANIPULATION DE DONNEES----*/
+
+/*Ordonner les données*/
+/*NB : indispensable pour utiliser l'instruction by*/
+proc sort data=tp.inclu_dummy out=tp.inclu_dummy_sort;
+by DIPNIV descending AGE0;
+run;
+/*ici on trie par ordre croissant de DIPNIV puis par ordre décroissant d'âge*/
+
+/*Copier un jeu de données*/
+/*intégralement : */
+data tp.inclu_dummy_copie;
+set tp.inclu_dummy;
+run;
+
+/*partiellement :*/
+/*Conserver certaines variables : keep*/
+data tp.inclu_dummy_copie;
+set tp.inclu_dummy;
+keep age0 dipniv;
+run;
+
+/*Supprimer certaines variables : drop*/
+data tp.inclu_dummy_copie;
+set tp.inclu_dummy;
+drop age0;
+/*On peut sélectionner un bloc de variables : drop age0--dipniv;*/
+run;
+
+/*Sélectionner des variables selon un critère*/
+data tp.inclu_dummy_select;
+set tp.inclu_dummy;
+if dipniv > 1 then output;
+/*si on veut supprimer : if dipniv eq 1 then delete;*/
+run;
+
+/*L'instruction where*/
+/*On peut également filtrer par l'instruction where, qui arrete le chargement si la condition n'est pas vérifiée*/
+data tp.inclu_dummy_select2;
+set tp.inclu_dummy (where=(dipniv > 1));
+run;
+
+data tp.inclu_dummy_select2;
+set tp.inclu_dummy;
+where dipniv > 1;
+run;
+
+/*Manipulation de plusieurs tables*/
+
+/*On peut utiliser plusieurs tables en output :*/
+
+data tp.inclu_out1 tp.inclu_out2;
+set tp.inclu_dummy;
+if dipniv > 2 then output tp.inclu_out1;
+if dipniv < 2 then output tp.inclu_out2;
+run;
+
+/*Concaténation de tables*/
+data tp.inclu_conc;
+set tp.inclu_out1 tp.inclu_out2;
+run;
+
+/*L'instruction MERGE */
+/*La concaténation simple génère de nombreuses données manquantes.*/
+/*Pour associer en fonction d'une clé, il faud'abord trier par l'instruction sort, puis utiliser merge :*/
+proc sort data = tp.inclu_out1;
+by AGE0;
+run;
+
+proc sort data = tp.inclu_out2;
+by AGE0;
+run;
+
+data tp.inclu_merge;
+merge tp.inclu_out1 tp.inclu_out2;
+by AGE0;
+run;
+
+/*Manipulation des variables*/
+
+/*ATTRIB permet d'attribuer :
+- un format d'écriture ou de lecture
+- une longueur de stockage
+- un label*/
+
+data tp.inclu_dummy_label;
+set tp.inclu_dummy;
+attrib AGE0 label="Âge" dipniv label="Niveau d'études";
+run;
+
+/*On vérifie la procédure par une procédure CONTENTS*/
+proc contents data=tp.inclu_dummy_label;
+run;
+
+/*On peut également ordonner les variables en plaçant attrib avant sexe*/
+data tp.inclu_order;
+attrib AGE0 DIPNIV label="";
+set tp.inclu_dummy;
+run;
+
+/* RENAME permet de changer le nom d'une variable*/
+data tp.inclu_rename /*on peut la renseigner dans l'étape data : data tp.inclu (rename=(age0=AGE))*/;
+set tp.inclu_dummy;
+rename age0=AGE dipniv=NIVETUDES;
+run;
+
+/*Création de variable*/
+data tp.inclu_create;
+set tp.inclu_dummy;
+ageniv = floor(age0) + dipniv;
+run;
+
+/*Fonctions :
+- SUM(x,y) : somme des valeurs (non manquantes)
+- N(x,y) : nombre de valeurs parmi x et y
+- MEAN (x,y) moyenne des valeurs (non manquantes)
+- VAR (x,y) : variance des valeurs (non manquantes)
+- STD (x,y) : écart-type des valeurs (non manquantes)
+- MIN (x,y) : minimum des valeurs (non manquantes)
+- MAX (x,y) : maximum des valeurs (non manquantes)
+- NMISS (x,y) : nombre de valeurs non manquantes
+- ABS(x) : valeur absolue de x
+- CEIL(x) : arrondi supérieur de x
+- FLOOR(x) : arrondi inférieur de x
+- INT(x) : partie entière de x
+- ROUND (x,y) : arrondi de x avec une précision de y
+
+ex. si on veut arrondir à 2 chiffres après la virgule :
+nvar1 = round(var1,.01);
+*/
+
+/*Manipulation des chaines de caractères*/
+
+/*Concaténation*/
+data tp.inclu_concaten;
+set tp.inclu_dummy;
+if dipniv > 2 then str1 = "a";
+if dipniv < 3 then str1="b";
+if age0 > 70 then str2 = "c";
+if age0 < 70 then str2 = "d";
+str3 = str1!!str2!!"coucou";
+run;
+
+/*Soustraction*/
+data tp.inclu_concaten2;
+set tp.inclu_concaten;
+init = substr(str3,1,5);
+run;
+
+/*Gestion des dates:
+Les formats de date comprennent :
+- ddmmyy10. pour une date sous format 01/09/2013
+- ddmmyy8. pour une date sous format 01/09/13
+- mmddyy10. pour une date sous format 09/01/2013
+- mmddyy8. pour une date sous format 09/01/13
+- date9. pour une date sous format 01sep2013
+- date7. pour une date sous format 01sep13*/
+
+/*Si on a les valeurs sur plusieurs variables*/
+
+
+data tp.date;
+format vdate ddmmyy10.;
+vdate = mdy(vmois,vjour,van);
+run;
+
+/*Pour extraire le jour, le mois, l'année :*/
+data tp.date;
+jour = day(vdate);
+mois = month(vdate);
+annee = year(vdate);
+run;
+
+/*Pour calculer un délai entre deux dates, on peut directement soustraire ou utiliser l'instruction intck*/
+data tp.date;
+delai_jour = intck("day",date1,date2);
+delai_sem = intck("week",date1,date2);
+delai_mois = intck("month",date1,date2);
+delai_trimestre = intck("qtr",date1,date2);
+delai_an = intck("year",date1,date2);
+run;
+
+/*Date courante*/
+data tp.date;
+format datec date9.;
+datec = today();
+run;
+
+/*Opérateurs conditionnels :
+- = ou EQ
+- ^= ou NE (différent de)
+- > GT (supérieur)
+- >= GE (supérieur ou égal)
+- < LT (inférieur)
+- <= LE (inférieur ou égal)
+- in (appartient à la liste qui suit)
+- notin (n'appartient pas)
+- & et
+- | ou (non exclusif)
+
+ATTENTION +++ au parenthésage et aux données manquantes !
+*/
+
+/*Instructions de controle :*/
+
+/*IF ELSE*/
+data tp.inclu_dummy_if tp.inclu_dummy_else;
+set tp.inclu_dummy;
+if age0 > 70 then output tp.inclu_dummy_if;
+else output tp.inclu_dummy_else;
+run;
+
+data tp.inclu_dummy_if tp.inclu_dummy_else;
+set tp.inclu_dummy;
+if age0 > 70 then do;
+	age1 = 10*age0;
+	output tp.inclu_dummy_if;
+	end;
+else output tp.inclu_dummy_else;
+run;
+
+/*DO*/
+data tp.inclu_dummy_do tp.inclu_dummy_else;
+set tp.inclu_dummy;
+if age0 > 70 AND dipniv > 1 then do;
+	age1 = 10*age0;
+	output tp.inclu_dummy_if;
+	end;
+else output tp.inclu_dummy_else;
+run;
+
+data tp.inclu_dummy_do_until tp.inclu_dummy_else;
+set tp.inclu_dummy;
+do until (i >=age0);
+	i = i+20;
+	output;
+	end;
+run;
+
+/*First et Last :
+- à chaque fois que l'on trie un jeu de données, deux variables invisibles sont créées :
+- First : à chaque fois qu'un nouveau niveau est rencontré
+- Last : à chaque fois qu'un nouveau niveau est rencontré pour la dernière fois
+*/
+
+proc sort data=tp.inclu_dummy;
+by dipniv;
+run;
+
+data tp.inclu_dummy_1 tp.inclu_dummy_2;
+set tp.inclu_dummy;
+if first.dipniv = 1 then output tp.inclu_dummy_1;
+if last.dipniv = 1 then output tp.inclu_dummy_2;
+run;
+
+/*Retain
+- permet de retenir une valeur entre différentes lignes
+*/
+
+data tp.inclu_dummy;
+set tp.inclu_dummy;
+retain total 0;
+total = total + dipniv;
+retain count 0;
+count = count + 1;
+run;
+
+/*Arrays :
+- Un array est un vecteur temporaire, disparaissant à la fin de l'étape data
+- on spécifie sa longueur, les variables qu'il contient, on l'initialise*/
+data exar2;
+set suivi_pa;
+array mes{6} tauxa tauxb tauxc  tauxd tauxe tauxg;
+array diff{5} dif_t1-dif_t5 (0,0,0,0,0);
+do i=1 to 5;
+	diff{i} = mes{i+1}-mes{i};
+	end;
+run;
+
+/*----PROCEDURES STATISTIQUES----*/
+
+/*-- Statistiques descriptives --*/
+
+/*Procédure MEANS :
+- décrit une variable quantitative */
+proc means data=tp.inclu;
+var age0 dipniv;
+run;
+
+/*On peut aussi avoir un descriptif séparé par modalité d'une autre variable :*/
+
+proc means data=tp.inclu;
+var age0;
+class dipniv;
+run;
+
+/*On peut préciser les informations que l'on souhaite obtenir dans les arguments de la procédure :*/
+proc means data = tp.inclu n mean q1 median q3;
+var age0;
+where dipniv=1;
+run;
+
+/*Procédure UNIVARIATE :
+- procédure plus complète que means
+- on peut aussi demander un test de normalité, et un tableau des fréquences
+*/
+proc univariate data=tp.inclu normal freq;
+var age0;
+run;
+
+/*On peut utiliser la procédure pour créer une table pour manipuler les statistiques par groupe :
+- On aura donc une ligne par modalité de dipniv, qui montre :
+	- l'effectif de la classe
+	- la moyenne
+	- l'écart-type*/
+
+proc univariate data=tp.inclu;
+var age0;
+class dipniv;
+output out=tp.age_dipniv n=n mean=moy std=ect;
+run;
+
+/*On peut aussi demander à ajouter l'histogramme, et éventuellement des options graphiques*/
+
+proc univariate data = tp.inclu;
+var age0;
+histogram age / endpoints = 65 to 95 by 5;
+inset mean="Moyenne" std = "Ecart-type" median = "Médiane" / pos=ne;
+run;
+
+/*Procédure TABULATE :
+- permet de décrire une variable quantitative
+- permet de faire un tableau en fonction des modalités de deux variables qualitatives
+- ex si on veut faire un tableau des différentes modalités de sexe et de tabac pour à chaque case l'effectif et la moyenne :*/
+proc tabulate data=tp.data;
+var age;
+class sexe tabac;
+table sexe*tabac, age*n age*mean;
+run;
+
+/*Procédure FREQ :
+- utilisée pour décrire des variables qualitatives
+- permet aussi de faire des tests
+- permet de faire des tableaux à deux dimensions
+*/
+
+proc freq data = tp.data;
+tables sexe*tabac /*On peut ajouter comme options : / nocol norow nopercent nofreq missing (fait appara^tre les NA)*/;
+run;
+
+/*Corrélation*/
+
+proc corr data = tp.data pearson/*on peut spécifier pearson spearman*/;
+var poids taille;
+/*by sexe permet de faire par classe*/;
+run;
+
+/*----PROCEDURES GRAPHIQUES----*/
+/*GCHART : diagrammes (barres horizontales, verticales, secteurs :
+- Vbar : vertical
+- Hbar : horizontaux
+- Block : en 3D
+- Pie : secteurs
+
+Principales options graphiques :
+- discrete : force à traiter la variable comme une variable discrète
+- midpoints (pour vbar et hbar) : spécifie le centre des classes
+- space=0 : colle les barres verticales > fait un histogramme
+- group : produit 1 diagramme par groupes
+- subgroup (commune à vbar, hbar, block) : m^me diagramme sur différents groupes*/
+
+proc gchart data = tp.data;
+vbar age / midpoints = 70 to 100 by 10 group = sexe /* différent de subgroup = sexe*/;
+run;
+
+/*Diagramme en batons sur la variable tabac :*/
+proc gchart data= tp.data;
+vbar tabac / discrete; 
+run;
+
+/*Nuage de points*/
+proc gplot data = tp.data;
+plot poids*taille=sexe;
+symbol v=circle c=red;
+symbol2 v=triangle c=green;
+run;
+
+/*Estimation d'une fonction de densité de probabilité*/
+proc kde data=tp.data out=bidim;
+var poids taille;
+run;
