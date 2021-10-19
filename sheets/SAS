@@ -285,6 +285,7 @@ run;
 
 data tp.inclu_dummy_1 tp.inclu_dummy_2;
 set tp.inclu_dummy;
+by dipniv;
 if first.dipniv = 1 then output tp.inclu_dummy_1;
 if last.dipniv = 1 then output tp.inclu_dummy_2;
 run;
@@ -389,6 +390,14 @@ run;
 proc corr data = tp.data pearson/*on peut spécifier pearson spearman*/;
 var poids taille;
 /*by sexe permet de faire par classe*/;
+run;
+
+/*Modèles mixtes */
+proc mixed data = tp.df method = ML covtest;
+class id;
+model albumin = year / s;/*au niveau de la population*/
+random intercept year / subject = id type = UN;
+/*au niveau de l'individu, type = UN signifie structure de covariance non déterminée, soit on ne fait pas l'hypothèse d'indépendance des effets aléatoires*/
 run;
 
 /*----PROCEDURES GRAPHIQUES----*/
