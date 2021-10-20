@@ -290,6 +290,22 @@ if first.dipniv = 1 then output tp.inclu_dummy_1;
 if last.dipniv = 1 then output tp.inclu_dummy_2;
 run;
 
+/*Exemple : créer indicateur puis ne garder que les premières et dernières lignes :*/
+proc sort data=tp.essai_dat0;
+by num_pat date_vis;
+run;
+
+
+data exo8;
+set  tp.essai_dat0;
+by num_pat;
+indic_p = first.num_pat;
+indic_d = last.num_pat;
+if last.num_pat = 1 or first.num_pat = 1 then output;
+drop sexe;
+run;
+
+
 /*Retain
 - permet de retenir une valeur entre différentes lignes
 */
@@ -361,8 +377,14 @@ run;
 
 proc univariate data = tp.inclu;
 var age0;
-histogram age / endpoints = 65 to 95 by 5;
+histogram age / *Normal; endpoints = 65 to 95 by 5;
 inset mean="Moyenne" std = "Ecart-type" median = "Médiane" / pos=ne;
+run;
+
+proc univariate data=tp.nut0;
+var age taille poids ;
+*histogram age taille poids;
+*inset mean='moyenne'/ pos=ne ;
 run;
 
 /*Procédure TABULATE :
@@ -383,6 +405,33 @@ run;
 
 proc freq data = tp.data;
 tables sexe*tabac /*On peut ajouter comme options : / nocol norow nopercent nofreq missing (fait appara^tre les NA)*/;
+run;
+
+/*Test Chi-2*/
+proc freq data=nut0;
+tables the0*sexe / chisq expected;
+run;
+
+/*T-test*/
+proc ttest data=nut0;
+var age;
+class the0;
+run;
+
+proc ttest data=nut0 H0=75;
+var age;
+*class the0;
+run;
+
+/*ANOVA*/
+proc npar1way data=nut0 anova;
+var age;
+class the0;
+run;
+
+proc npar1way data=nut0 wilcoxon;
+var age;
+class situation;
 run;
 
 /*Corrélation*/
@@ -418,9 +467,34 @@ proc gchart data = tp.data;
 vbar age / midpoints = 70 to 100 by 10 group = sexe /* différent de subgroup = sexe*/;
 run;
 
+proc gchart data = tp.data;
+vbar dipniv /discrete;
+run;
+
+proc gchart data=tp.nut;
+block situation / discrete ;
+run;
+
+proc gchart data=tp.nut;
+vbar situation / type=percent discrete ;
+run;
+
 /*Diagramme en batons sur la variable tabac :*/
 proc gchart data= tp.data;
 vbar tabac / discrete; 
+run;
+
+/*évolution du nombre moyen de CD4, avec son intervalle de confiance, pour chaque visite et chaque groupe de randomisation*/
+proc gplot data=tp.essai_dat;
+plot cd4*numvis=ran_grp ;
+run;
+
+proc gplot data=tp.essai_dat;
+plot cd4*numvis=ran_grp / legend=legend1 vaxis=0 to 1000 by 100;
+symbol1 i=stdmtj mode=include c=blue width=2 v=none ;
+symbol2 i=stdmtj mode=include c=green width=2 l=2 v=none;
+legend1 position=(top right inside) label=('Traitement') 
+value=(font=arial height=2 tick=1 'Trt A' tick=2 'Trt B') across=1;
 run;
 
 /*Nuage de points*/
@@ -434,3 +508,37 @@ run;
 proc kde data=tp.data out=bidim;
 var poids taille;
 run;
+
+/*-----MACROS-----*/
+
+*Macro variable :;
+
+*- Déclaration :;
+%let ma_var = age poids;
+
+*- Imprimer la variable
+%put &ma_var;
+
+*- Appeler la variable;
+proc means data=tp.data;
+var &ma_var;
+run;
+
+* - Concaténation :;
+%let fichier=data;
+%let lib=tp;
+%let table =lib..&fichier;
+%put &fichier &lib &table;
+
+*Macro fonction :;
+%macro desc_tab(table);
+proc contents data=&table;
+title "Caracteristiques de la table &table"; 
+run;
+%mend desc_tab; *Termine l'instruction macro;
+
+%desc_tab(tp.nut);
+%desc_tab(tp.sujet);
+%desc_tab(tp.inclus);
+
+
